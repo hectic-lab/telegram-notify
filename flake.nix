@@ -46,8 +46,9 @@
       };
     }) // {
    nixosModules = {
-      telegram-notify = { config, system, pkgs, lib, ... }:
+      telegram-notify = { config, pkgs, lib, ... }:
       let
+        system = pkgs.system;
         cfg = config.hectic.telegram-notify;
         servicePkg = if cfg.package != null then cfg.package else pkgs.packages.${system}.default;
       in {

@@ -45,23 +45,40 @@
         doCheck = true;
       };
     }) // {
-      nixosModules = {
-        vproxy-rest = { config, system, pkgs, ... }:
-	let
-	  lib = pkgs.lib;
-	  cfg = config.hectic.telegram-notify;
-        in
-	{
-	  options = {
-            hectic.telegram-notify.enable = lib.mkOption {
+   nixosModules = {
+      telegram-notify = { config, system, pkgs, lib, ... }:
+      let
+        cfg = config.hectic.telegram-notify;
+        servicePkg = if cfg.package != null then cfg.package else pkgs.packages.${system}.default;
+      in {
+        options = {
+          hectic.telegram-notify = {
+            enable = lib.mkOption {
               type = lib.types.bool;
               default = false;
+              description = "Enable the VProxy Rest service.";
             };
-	  };
-	  config = lib.mkIf cfg.enable {
-	  };
+            token = lib.mkOption {
+              type = lib.types.str;
+              default = "";
+              description = "Telegram Bot token for sending notifications.";
+            };
+          };
+        };
+  
+        config = lib.mkIf cfg.enable {
+          systemd.services.vproxy-rest = {
+            description = "VProxy Rest service";
+            after = [ "network.target" ];
+            wantedBy = [ "multi-user.target" ];
+            serviceConfig = {
+              ExecStart = "${self.packages.${system}.default}/bin/telegram-notify";
+              Environment = "TELEGRAM_TOKEN=${cfg.token}";
+              Restart = "on-failure";
+            };
+          };
         };
       };
     };
-
+  };
 }

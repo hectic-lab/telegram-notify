@@ -1,16 +1,18 @@
 #[macro_use]
 extern crate rocket;
+use rocket::State;
 use color_eyre::Result;
-use lazy_static::lazy_static;
 use reqwest;
-use rocket::serde::{json::Json, Deserialize};
+use rocket::serde::{json::Json, Deserialize, Serialize};
 
-lazy_static! {
-    static ref TELEGRAM_BOT_TOKEN: String =
-        std::env::var("TELEGRAM_TOKEN").expect("TELEGRAM_TOKEN is not set");
-}
+struct TelegramBotToken(String);
 
-async fn telegram_send_message(user_id: i64, message_text: &str, parse_mode: &str) -> Result<()> {
+async fn telegram_send_message(
+    user_id: i64,
+    message_text: &str,
+    parse_mode: &str,
+    token: &str,
+) -> Result<()> {
     #[derive(serde::Serialize)]
     struct TelegramSendMessage {
         chat_id: i64,
@@ -18,10 +20,7 @@ async fn telegram_send_message(user_id: i64, message_text: &str, parse_mode: &st
         parse_mode: String,
     }
 
-    let url = format!(
-        "https://api.telegram.org/bot{}/sendMessage",
-        *TELEGRAM_BOT_TOKEN
-    );
+    let url = format!("https://api.telegram.org/bot{}/sendMessage", token);
 
     let response = reqwest::Client::new()
         .post(&url)
@@ -52,38 +51,42 @@ fn default_parse_mode() -> &'static str {
     "MarkdownV2"
 }
 
-#[derive(rocket::serde::Serialize)]
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
 struct SendMessageResponse {
     successful: Vec<i64>,
     errors: Vec<i64>,
 }
 
 #[post("/send_message", format = "json", data = "<message_data>")]
-async fn send_message(message_data: Json<MessageData<'_>>) -> Json<SendMessageResponse>{
-    let message = message_data.message;
-    let parse_mode = message_data.parse_mode;
-    let user_list = message_data.user_list.clone();
+async fn send_message(
+    message_data: Json<MessageData<'_>>,
+    token: &State<TelegramBotToken>,
+) -> Json<SendMessageResponse> {
+    let mut successful = Vec::new();
+    let mut errors = Vec::new();
 
-    let mut successful: Vec<i64> = Vec::new();
-    let mut errors: Vec<i64> = Vec::new();
-
-    for user_id in user_list {
-        match telegram_send_message(user_id, message, parse_mode).await {
-            Ok(_) => {
-                successful.push(user_id);
-            },
-            Err(_) => {
-                errors.push(user_id);
-            }
+    for user_id in message_data.user_list.clone() {
+        match telegram_send_message(
+            user_id,
+            message_data.message,
+            message_data.parse_mode,
+            &token.0,
+        )
+        .await
+        {
+            Ok(_) => successful.push(user_id),
+            Err(_) => errors.push(user_id),
         }
     }
-    Json::from(SendMessageResponse {
-        successful,
-        errors,
-    })
+    Json(SendMessageResponse { successful, errors })
 }
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![send_message])
+    let telegram_bot_token =
+        std::env::var("TELEGRAM_TOKEN").expect("TELEGRAM_TOKEN is not set");
+    rocket::build()
+        .manage(TelegramBotToken(telegram_bot_token))
+        .mount("/", routes![send_message])
 }

@@ -58,6 +58,11 @@
               default = false;
               description = "Enable the VProxy Rest service.";
             };
+	    port = lib.mkOption {
+              type = lib.types.int;
+              default = 8000;
+              description = "Port on which the service will run.";
+            };
             token = lib.mkOption {
               type = lib.types.str;
               default = "";
@@ -73,7 +78,10 @@
             wantedBy = [ "multi-user.target" ];
             serviceConfig = {
               ExecStart = "${self.packages.${system}.default}/bin/telegram-notify";
-              Environment = "TELEGRAM_TOKEN=${cfg.token}";
+	      Environment = [
+                "TELEGRAM_TOKEN=${cfg.token}"
+                "PORT=${toString cfg.port}"
+              ];
               Restart = "on-failure";
             };
           };

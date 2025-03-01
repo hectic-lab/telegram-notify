@@ -86,7 +86,12 @@ async fn send_message(
 fn rocket() -> _ {
     let telegram_bot_token =
         std::env::var("TELEGRAM_TOKEN").expect("TELEGRAM_TOKEN is not set");
+    let port: i32 = std::env::var("PORT")
+    .unwrap_or_else(|_| "8000".to_string())
+    .parse()
+    .unwrap_or(8000);
     rocket::build()
+        .configure(rocket::Config::figment().merge(("port", port)))
         .manage(TelegramBotToken(telegram_bot_token))
         .mount("/", routes![send_message])
 }

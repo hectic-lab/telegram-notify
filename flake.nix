@@ -29,7 +29,7 @@
         inherit nativeBuildInputs;
         buildInputs = [pkgs.openssl];
       };
-    packages.${system}.defalut =
+    packages.${system}.default =
       let
         src = ./.;
         cargo = util.lib.cargoToml src;

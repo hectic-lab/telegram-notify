@@ -39,6 +39,7 @@
         version = cargo.package.version;
 
         inherit nativeBuildInputs src;
+	buildInputs = [ pkgs.openssl ];
 
         cargoLock.lockFile = ./Cargo.lock;
 
